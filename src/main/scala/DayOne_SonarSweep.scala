@@ -1,20 +1,13 @@
-import DayOne_SonarSweep.PartOne.{readFile, sonarSweep}
+import DayOne_SonarSweep.PartOne.sonarSweep
 import DayOne_SonarSweep.PartTwo.getThreeWindowSums
+import Utils.readFileAsInts
 
-import java.io.InputStream
 import scala.annotation.tailrec
 
 object DayOne_SonarSweep {
   type AccPrevType = (Int, Some[Int])
 
   object PartOne {
-    val readFile: InputStream => List[Int] = (is: InputStream) => {
-      val bufferedSource = io.Source.fromInputStream(is)
-      val lines = (for (line <- bufferedSource.getLines()) yield line).toList.map(_.toInt)
-      bufferedSource.close
-      lines
-    }
-
     val sonarSweep: Seq[Int] => Int = (depths: Seq[Int]) => {
       val initialVal: (Int, Option[Int]) = (0, None)
       depths.foldLeft(initialVal)((acc: (Int, Option[Int]), curr: Int) => {
@@ -91,11 +84,11 @@ object DayOne_SonarSweep {
 
   def main(args: Array[String]): Unit = {
     /* Part One */
-    println(sonarSweep(readFile(ClassLoader.getSystemResourceAsStream("day1input.txt"))))
+    println(sonarSweep(readFileAsInts("day1input.txt")))
 
     /* Part Two */
     //val linesAry = Array(199, 200, 208, 210, 200, 207, 240, 269, 260, 263)
-    val linesAry = readFile(ClassLoader.getSystemResourceAsStream("day1input.txt")).toArray
+    val linesAry = readFileAsInts("day1input.txt").toArray
     val threeWindowSums = getThreeWindowSums(linesAry)
     println(sonarSweep(threeWindowSums))
   }
