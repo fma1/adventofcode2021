@@ -1,15 +1,18 @@
 import DayFourteen_ExtendedPolymerization.PartOne.getMostAndLeastCommonElements
-import DayFourteen_ExtendedPolymerization.PartTwo.getMostAndLeastCommonElementsV2
+import DayFourteen_ExtendedPolymerization.PartTwo.executeSimulationAndGetMinMaxDiff
 
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.math.BigDecimal.RoundingMode
 
 object DayFourteen_ExtendedPolymerization {
   type Rules = Map[String, Char]
   type NewRules = Map[String, (String, String)]
-  type PolymerMap = mutable.HashMap[String, Int]
+  type PolymerMap = mutable.HashMap[String, BigInt]
   type PolymerData = (String, Rules)
+
+  val BIG_INT_ONE = BigInt(1)
 
   def parseData(filename: String): PolymerData = {
     val bufferedSource = io.Source.fromInputStream(ClassLoader.getSystemResourceAsStream(filename))
@@ -57,10 +60,10 @@ object DayFourteen_ExtendedPolymerization {
         .mkString("")
     }
 
-    def getMostAndLeastCommonElements(data: PolymerData, steps: Int): (Int, Int) = {
+    def getMostAndLeastCommonElements(data: PolymerData, steps: Int): (BigInt, BigInt) = {
       data match {
         case (polymerTemplate, rules) =>
-          val elemMap = mutable.HashMap[Char, Int]()
+          val elemMap = mutable.HashMap[Char, BigInt]()
           polymerTemplate.foreach(ch => elemMap.put(ch, 0))
           rules.values.foreach(ch => elemMap.put(ch, 0))
 
@@ -81,94 +84,91 @@ object DayFourteen_ExtendedPolymerization {
   }
 
   object PartTwo {
-    def initializePolymerMap(polymerTemplate: String, polymerMap: PolymerMap): Unit = {
-      var idx = 0
-      val buffer = new StringBuilder()
+    def step(polymerMap: PolymerMap, rules: Rules): PolymerMap = {
+      val newPolymerMap = mutable.HashMap[String, BigInt]()
 
-      while (idx <= polymerTemplate.length - 2) {
-        buffer.clear()
-        buffer.addOne(polymerTemplate(idx))
-        buffer.addOne(polymerTemplate(idx + 1))
-        polymerMap.updateWith(buffer.toString())({
-          case Some(value) => Some(1 + value)
-          case None => Some(1)
-        })
-        idx = idx + 1
-      }
-    }
+      polymerMap.foreach {
+        case (elemPair, count) =>
+          if (!rules.contains(elemPair)) {
+            newPolymerMap.put(elemPair, count)
+          } else {
+            val newElem = rules(elemPair).toString
+            val newElem1 = elemPair(0).toString + newElem
+            val newElem2 = newElem + elemPair(1).toString
 
-    def processPolymerTemplateV2(polymerMap: PolymerMap, rules: NewRules): Unit = {
-      val origMap = polymerMap.toList.toMap
-
-      polymerMap.clear()
-      origMap.foreach {
-        case (elem, count) =>
-          polymerMap.put(elem, 0)
-
-          val remappingFunc: Option[Int] => Option[Int] = {
-            case Some(value) => Some(count + value)
-            case None => Some(count)
-          }
-
-          val newElems = rules(elem)
-          polymerMap.updateWith(newElems._1)(remappingFunc)
-          polymerMap.updateWith(newElems._2)(remappingFunc)
-      }
-    }
-
-    def getMostAndLeastCommonElementsV2(data: PolymerData, steps: Int): (Int, Int) = {
-      data match {
-        case (polymerTemplate, rules) =>
-          val singleElemMap = mutable.HashMap[Char, Int]()
-          polymerTemplate.foreach(ch => singleElemMap.put(ch, 0))
-          rules.values.foreach(ch => singleElemMap.put(ch, 0))
-
-          val newRules =
-            rules.map {
-              case (pair, elem) =>
-                (pair, (pair(0).toString + elem.toString, elem.toString + pair(1).toString))
+            val remappingFunc: Option[BigInt] => Option[BigInt] = {
+              case Some(value) => Some(count + value)
+              case None => Some(count)
             }
 
-          val polymerMap = mutable.HashMap[String, Int]()
-          initializePolymerMap(polymerTemplate, polymerMap)
-          (1 to steps).foreach(n => {
-            processPolymerTemplateV2(polymerMap, newRules)
-            // tempPolymerTemplate = processPolymerTemplate(tempPolymerTemplate, rules)
-            // println(s"After step $n: ${tempPolymerTemplate}")
+            newPolymerMap.updateWith(newElem1)(remappingFunc)
+            newPolymerMap.updateWith(newElem2)(remappingFunc)
+          }
+      }
+
+      newPolymerMap
+    }
+
+    def polymerStrToMap(polymerTemplate: String): PolymerMap = {
+      val polymerMap = mutable.HashMap[String, BigInt]()
+      val initialChar = polymerTemplate(0)
+      polymerTemplate.tail.foldLeft(initialChar)((prev, curr) => {
+        val elemPair = prev.toString + curr.toString
+        polymerMap.updateWith(elemPair)({
+          case Some(value) => Some(BIG_INT_ONE + value)
+          case None => Some(BIG_INT_ONE)
+        })
+        curr
+      })
+      polymerMap
+    }
+
+    def executeSimulationAndGetMinMaxDiff(data: PolymerData, steps: Int): BigInt = {
+      data match {
+        case (polymerTemplate, rules) =>
+          var polymerMap = polymerStrToMap(polymerTemplate)
+
+          (1 to steps).foreach(_ => {
+            polymerMap = step(polymerMap, rules)
           })
 
-          polymerMap.foreach {
-            case (pair, count) =>
-              val elem1 = pair(0)
-              val elem2 = pair(1)
+          // println(polymerMap.mkString(","))
 
-              singleElemMap.updateWith(elem1)({
-                case Some(value) => Some(count + value)
-                case None => Some(count)
-              })
-              singleElemMap.updateWith(elem2)({
-                case Some(value) => Some(count + value)
-                case None => Some(count)
-              })
-          }
+          val singleElementMap =
+            polymerMap.foldLeft(Map[Char, BigInt]())((acc, curr) => {
+              curr match {
+                case (elemPair, count) =>
+                  val remappingFunc: Option[BigInt] => Option[BigInt] = {
+                    case Some(value) => Some(count + value)
+                    case None => Some(count)
+                  }
+                  acc.updatedWith(elemPair(0))(remappingFunc)
+                    .updatedWith(elemPair(1))(remappingFunc)
+              }
+            }).map {
+              case (elemPair, count) =>
+                val countAsDec = BigDecimal(count)
+                val result = countAsDec / BigDecimal(2.0)
+                (elemPair, result.setScale(0, RoundingMode.CEILING).toBigInt)
+            }
 
-          // println(elemMap.mkString(" , "))
-          (singleElemMap.values.min, singleElemMap.values.max)
+          // println(singleElementMap.mkString(","))
+          singleElementMap.values.max - singleElementMap.values.min
       }
     }
   }
 
+
   def main(args: Array[String]): Unit = {
-    var tuple = (0, 0)
-    /*
+    /* Part One */
+    var tuple = (BigInt(0), BigInt(0))
     tuple = getMostAndLeastCommonElements(parseData("day14input_example.txt"), 10)
     println(tuple._2 - tuple._1)
     tuple = getMostAndLeastCommonElements(parseData("day14input.txt"), 10)
     println(tuple._2 - tuple._1)
-     */
 
-    // TODO: Fix Part 2
-    tuple = getMostAndLeastCommonElementsV2(parseData("day14input_example.txt"), 40)
-    println(tuple._2 - tuple._1)
+    /* Part Two */
+    println(executeSimulationAndGetMinMaxDiff(parseData("day14input_example.txt"), 40))
+    println(executeSimulationAndGetMinMaxDiff(parseData("day14input.txt"), 40))
   }
 }
